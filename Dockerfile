@@ -6,7 +6,7 @@ RUN apk add --no-cache build-base python3
 WORKDIR /app
 COPY server .
 
-# Kein npm-global-update nötig!
+# Kein npm-global-update nötig
 RUN npm install \
   && npm run build \
   && npm prune --production
