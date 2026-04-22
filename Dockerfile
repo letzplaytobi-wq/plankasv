@@ -8,7 +8,8 @@ WORKDIR /app
 
 COPY server .
 
-RUN npm install npm --global \
+RUN npm cache clean --force \
+  && npm install -g npm@latest \
   && npm install \
   && npm run build \
   && npm prune --production
