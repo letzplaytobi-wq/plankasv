@@ -9,7 +9,7 @@ WORKDIR /app
 COPY server .
 
 RUN npm cache clean --force \
-  && npm install -g npm@latest \
+  && npm install -g npm@10.9.0 \
   && npm install \
   && npm run build \
   && npm prune --production
