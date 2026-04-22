@@ -1,58 +1,57 @@
-# Stage 1: Server build
+# --- STAGE 1: Server build ---
 FROM node:22-alpine AS server
 
-RUN apk -U upgrade \
-  && apk add build-base python3 --no-cache
+RUN apk add --no-cache build-base python3
 
 WORKDIR /app
-
 COPY server .
 
-RUN npm cache clean --force \
-  && npm install -g npm@10.9.0 \
-  && npm install \
+# Kein npm-global-update nötig!
+RUN npm install \
   && npm run build \
   && npm prune --production
 
-# Stage 2: Client build
+# --- STAGE 2: Client build ---
 FROM node:22 AS client
 
 WORKDIR /app
-
 COPY client .
 
-RUN npm install npm --global \
-  && npm install --omit=dev \
+# --omit=dev reicht hier völlig aus
+RUN npm install --omit=dev \
   && INDEX_FORMAT=ejs DISABLE_ESLINT_PLUGIN=true npm run build
 
-# Stage 3: Final image
+# --- STAGE 3: Final image ---
 FROM node:22-alpine
 
-RUN apk -U upgrade \
-  && apk add bash python3 squid --no-cache \
-  && npm install npm --global
+# Installiere System-Pakete (bash, python, squid)
+RUN apk add --no-cache bash python3 squid
 
-USER node
 WORKDIR /app
 
-COPY --chown=node:node LICENSE.md .
-COPY --chown=node:node ["LICENSES/PLANKA Community License DE.md", "LICENSE_DE.md"]
+# Lizenzen kopieren
+COPY LICENSE.md .
+COPY ["LICENSES/PLANKA Community License DE.md", "LICENSE_DE.md"]
 
-COPY --from=server --chown=node:node /app/node_modules node_modules
-COPY --from=server --chown=node:node /app/dist .
+# Gebauten Server und Client kopieren
+COPY --from=server /app/node_modules node_modules
+COPY --from=server /app/dist .
+COPY --from=client /app/dist public
 
-COPY --from=client --chown=node:node /app/dist public
-
-RUN python3 -m venv .venv \
-  && .venv/bin/pip3 install --upgrade pip \
-  && .venv/bin/pip3 install -r requirements.txt --no-cache-dir \
-  && mv .env.sample .env \
-  && mv public/index.ejs views \
+# Wichtig: Diese Operationen VOR dem Wechsel zum User 'node' machen
+RUN mv .env.sample .env \
+  && mv public/index.ejs views || true \
   && npm config set update-notifier false
 
+# Falls ein start.sh existiert, muss es ausführbar sein
+RUN chmod +x start.sh || true
 
 EXPOSE 1337
 
+# Wechsel zum sicheren User 'node'
+USER node
+
+# Healthcheck & Start
 HEALTHCHECK --interval=10s --timeout=2s --start-period=15s \
   CMD node ./healthcheck.js
 
